@@ -4,190 +4,285 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#172554">
 <title>My Manual AI</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;padding:18px;background:#f1f5f9;color:#1e293b;font-family:sans-serif}
-header{background:#172554;color:white;padding:24px;border-radius:18px}
-h1{margin:0;font-size:25px}
-.sub{color:#cbd5e1}
-.card{background:white;padding:20px;margin-top:18px;border-radius:16px;box-shadow:0 2px 8px #0001}
-button{width:100%;padding:15px;border:0;border-radius:11px;background:#2563eb;color:white;font-size:16px;font-weight:bold;margin-top:10px}
+body{font-family:sans-serif;background:#f3f5f9;margin:0;padding:18px;color:#222}
+main{max-width:700px;margin:auto}
+h1{color:#2457a6}
+.card{background:white;padding:16px;margin:14px 0;border-radius:12px;box-shadow:0 2px 8px #0001}
+button{background:#2864c5;color:white;border:0;border-radius:8px;padding:10px 14px;margin:5px 3px;cursor:pointer}
 button:disabled{opacity:.5}
-input{width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px}
-.hint{color:#64748b;font-size:13px}
-.stat{font-size:25px;font-weight:bold}
-.item{border-top:1px solid #e2e8f0;padding:12px 0;overflow-wrap:anywhere}
-.item button{background:#dc2626;font-size:13px;padding:9px}
-#status{white-space:pre-wrap;color:#2563eb;font-size:14px}
+input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #bbb;border-radius:8px;margin:8px 0}
+.small{font-size:13px;color:#666}
+.file{border-top:1px solid #ddd;padding:12px 0}
+.result{background:#f5f7fb;padding:12px;margin:10px 0;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere}
+#status{white-space:pre-wrap;color:#2457a6}
 </style>
 </head>
 <body>
-
-<header>
+<main>
 <h1>📚 My Manual AI</h1>
-<p class="sub">自分専用マニュアル検索</p>
-</header>
+<p>自分専用のマニュアル検索アプリ</p>
 
-<section class="card">
-<h3>📂 PDFマニュアル管理</h3>
-<p class="hint">スマホ内にPDFを保存します。</p>
+<div class="card">
+<h3>① PDFマニュアルを登録</h3>
+<input id="picker" type="file" accept="application/pdf" multiple>
+<button id="add">PDFを登録する</button>
+<p id="status">準備完了</p>
+<p class="small" id="storage">保存容量を確認中...</p>
+</div>
 
-<input id="picker" type="file" accept="application/pdf,.pdf" multiple hidden>
+<div class="card">
+<h3>② 登録済みマニュアル</h3>
+<p id="count">登録数：0</p>
+<div id="files">読み込み中...</div>
+</div>
 
-<button id="add">＋ PDFを追加</button>
-<p id="status">保存先を確認しています...</p>
-</section>
+<div class="card">
+<h3>③ マニュアルを検索</h3>
+<input id="question" type="search" placeholder="探したい言葉を入力">
+<button id="search">検索する</button>
+<div id="results"></div>
+</div>
+<p class="small">PDFの保存と抽出した文章の検索は、この端末内で行います。PDF.jsの読み込みにはインターネット接続が必要です。</p>
+</main>
 
-<section class="card">
-<h3>💾 登録状況</h3>
-<p>登録PDF数</p>
-<div class="stat" id="count">0 件</div>
-<p>登録済みPDF容量</p>
-<div class="stat" id="total">0 MB</div>
-<p class="hint" id="storage">端末ストレージ確認中</p>
-</section>
+<script type="module">
+import * as pdfjsLib from
+'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
 
-<section class="card">
-<h3>📚 登録済みマニュアル</h3>
-<div id="files">まだPDFはありません。</div>
-</section>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
 
-<section class="card">
-<h3>🔍 マニュアル検索</h3>
-<input id="question" placeholder="質問やキーワードを入力">
-<button onclick="alert('次の段階で検索機能を追加します！')">検索する</button>
-<p class="hint">検索機能は次の開発段階で追加します。</p>
-</section>
+const $ = id => document.getElementById(id);
+let library;
 
-<script>
-const statusEl=document.getElementById('status');
-const picker=document.getElementById('picker');
-let library=null;
+const dbPromise = new Promise((resolve,reject)=>{
+  const request = indexedDB.open('MyManualAI',1);
+  request.onupgradeneeded = ()=>{
+    const db = request.result;
+    if(!db.objectStoreNames.contains('pages')){
+      const store = db.createObjectStore('pages',{keyPath:'id'});
+      store.createIndex('filename','filename',{unique:false});
+    }
+  };
+  request.onsuccess = ()=>resolve(request.result);
+  request.onerror = ()=>reject(request.error);
+});
 
-function formatSize(bytes){
- if(bytes<1024*1024)return (bytes/1024).toFixed(1)+' KB';
- return (bytes/1024/1024).toFixed(1)+' MB';
+async function savePage(record){
+  const db = await dbPromise;
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('pages','readwrite');
+    tx.objectStore('pages').put(record);
+    tx.oncomplete = resolve;
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+
+async function getAllPages(){
+  const db = await dbPromise;
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('pages','readonly');
+    const req = tx.objectStore('pages').getAll();
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+
+async function deletePages(filename){
+  const db = await dbPromise;
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('pages','readwrite');
+    const store = tx.objectStore('pages');
+    const req = store.index('filename').openCursor(IDBKeyRange.only(filename));
+    req.onsuccess = ()=>{
+      const cursor = req.result;
+      if(cursor){ cursor.delete(); cursor.continue(); }
+    };
+    tx.oncomplete = resolve;
+    tx.onerror = ()=>reject(tx.error);
+  });
 }
 
 async function init(){
- try{
-  if(!navigator.storage?.getDirectory){
-   throw new Error('このブラウザは端末内ファイル保存に対応していません。Chromeで開いてください。');
+  try{
+    if(!navigator.storage || !navigator.storage.getDirectory){
+      throw new Error('このブラウザは端末内PDF保存に対応していません。Chromeで開いてください。');
+    }
+    const root = await navigator.storage.getDirectory();
+    library = await root.getDirectoryHandle('ManualLibrary',{create:true});
+    await refresh();
+    await updateStorage();
+  }catch(e){
+    $('status').textContent='初期化エラー：'+e.message;
   }
-  library=await (await navigator.storage.getDirectory())
-    .getDirectoryHandle('ManualLibrary',{create:true});
-  if(navigator.storage.persist){
-   await navigator.storage.persist();
+}
+
+async function updateStorage(){
+  if(navigator.storage?.estimate){
+    const e=await navigator.storage.estimate();
+    const used=(e.usage/1024/1024/1024).toFixed(2);
+    const quota=(e.quota/1024/1024/1024).toFixed(2);
+    $('storage').textContent=`端末内の使用量：約${used}GB / 使用可能容量：約${quota}GB`;
   }
-  statusEl.textContent='端末内の保存先を準備できました。';
-  await refresh();
- }catch(e){
-  statusEl.textContent='準備できませんでした：'+e.message;
- }
+  if(navigator.storage?.persist){
+    await navigator.storage.persist();
+  }
 }
 
 async function refresh(){
- if(!library)return;
- let count=0,total=0;
- const list=document.getElementById('files');
- list.innerHTML='';
- for await(const [name,handle] of library.entries()){
-  if(handle.kind!=='file')continue;
-  const file=await handle.getFile();
-  count++;total+=file.size;
-  const item=document.createElement('div');
-  item.className='item';
-  const title=document.createElement('strong');
-  title.textContent=name;
-  const info=document.createElement('p');
-  info.className='hint';
-  info.textContent=formatSize(file.size);
-  const del=document.createElement('button');
-  del.textContent='削除';
-  del.onclick=async()=>{
-   if(confirm(name+' を削除しますか？')){
-    await library.removeEntry(name);
-    await refresh();
-   }
-  };
-  item.append(title,info,del);
-  list.appendChild(item);
- }
- if(count===0)list.textContent='まだPDFはありません。';
- document.getElementById('count').textContent=count+' 件';
- document.getElementById('total').textContent=formatSize(total);
+  if(!library)return;
+  const names=[];
+  for await(const [name,handle] of library.entries()){
+    if(handle.kind==='file' && name.toLowerCase().endsWith('.pdf')){
+      names.push(name);
+    }
+  }
+  names.sort();
+  $('count').textContent=`登録数：${names.length}`;
+  $('files').innerHTML='';
+  const pages=await getAllPages();
+  const extracted=new Set(pages.map(p=>p.filename));
 
- try{
-  const estimate=await navigator.storage.estimate();
-  const quota=estimate.quota||0;
-  const usage=estimate.usage||0;
-  document.getElementById('storage').textContent=
-   'ブラウザ全体の使用量：約'+formatSize(usage)+
-   ' / 利用可能枠：約'+formatSize(quota);
- }catch(e){
-  document.getElementById('storage').textContent='容量情報を取得できません。';
- }
+  for(const name of names){
+    const handle=await library.getFileHandle(name);
+    const file=await handle.getFile();
+    const div=document.createElement('div');
+    div.className='file';
+
+    const title=document.createElement('strong');
+    title.textContent=name;
+    const info=document.createElement('p');
+    info.className='small';
+    info.textContent=`${(file.size/1024/1024).toFixed(1)} MB ・ ${extracted.has(name)?'文字抽出済み':'未抽出'}`;
+
+    const extract=document.createElement('button');
+    extract.textContent=extracted.has(name)?'もう一度文字を抽出':'文字を抽出';
+    extract.onclick=()=>extractPdf(name,handle,extract);
+
+    const del=document.createElement('button');
+    del.textContent='削除';
+    del.style.background='#777';
+    del.onclick=async()=>{
+      if(!confirm(`${name} を削除しますか？`))return;
+      await library.removeEntry(name);
+      await deletePages(name);
+      await refresh();
+      await updateStorage();
+      $('status').textContent='削除しました';
+    };
+
+    div.append(title,info,extract,del);
+    $('files').append(div);
+  }
+  if(!names.length)$('files').textContent='まだPDFは登録されていません';
 }
 
-document.getElementById('add').onclick=()=>{
- if(!library){
-  statusEl.textContent='保存先を準備できていません。';
-  return;
- }
- picker.click();
+$('add').onclick=async()=>{
+  const files=[...$('picker').files];
+  if(!files.length){
+    $('status').textContent='先にPDFを選択してください';
+    return;
+  }
+  $('add').disabled=true;
+  try{
+    for(let i=0;i<files.length;i++){
+      const file=files[i];
+      if(file.type!=='application/pdf' && !file.name.toLowerCase().endsWith('.pdf'))continue;
+      $('status').textContent=`登録中 ${i+1}/${files.length}：${file.name}`;
+      const handle=await library.getFileHandle(file.name,{create:true});
+      const writable=await handle.createWritable();
+      await file.stream().pipeTo(writable);
+    }
+    $('status').textContent='PDFの登録が完了しました';
+    $('picker').value='';
+    await refresh();
+    await updateStorage();
+  }catch(e){
+    $('status').textContent='登録エラー：'+e.message;
+  }finally{
+    $('add').disabled=false;
+  }
 };
 
-picker.onchange=async()=>{
- const files=Array.from(picker.files||[]);
- if(!files.length)return;
- const button=document.getElementById('add');
- button.disabled=true;
- try{
-  for(let i=0;i<files.length;i++){
-   const file=files[i];
-   if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf')){
-    throw new Error(file.name+' はPDFではありません。');
-   }
-   const estimate=await navigator.storage.estimate();
-   const available=(estimate.quota||0)-(estimate.usage||0);
-   if(file.size>available){
-    throw new Error('保存容量が不足しています。'+file.name);
-   }
+async function extractPdf(name,handle,button){
+  button.disabled=true;
+  try{
+    $('status').textContent=`${name} を読み込んでいます...`;
+    const file=await handle.getFile();
+    const data=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data}).promise;
 
-   let name=file.name;
-   let n=1;
-   while(true){
-    try{
-     await library.getFileHandle(name);
-     const dot=file.name.lastIndexOf('.');
-     name=dot>0?file.name.slice(0,dot)+' ('+n+++')'+file.name.slice(dot):file.name+' ('+n+++')';
-    }catch(e){
-     break;
+    await deletePages(name);
+
+    for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
+      $('status').textContent=
+        `文字を抽出中：${name}\n${pageNo} / ${pdf.numPages} ページ`;
+
+      const page=await pdf.getPage(pageNo);
+      const content=await page.getTextContent();
+      const text=content.items
+        .map(item=>item.str)
+        .filter(Boolean)
+        .join(' ');
+
+      await savePage({
+        id:name+'::'+pageNo,
+        filename:name,
+        page:pageNo,
+        text:text
+      });
     }
-   }
 
-   statusEl.textContent='保存中 '+(i+1)+' / '+files.length+'：'+name;
-   const handle=await library.getFileHandle(name,{create:true});
-   const writable=await handle.createWritable();
-   try{
-    await file.stream().pipeTo(writable);
-   }catch(e){
-    try{await writable.abort()}catch(_){}
-    await library.removeEntry(name).catch(()=>{});
-    throw e;
-   }
+    $('status').textContent=
+      `文字抽出が完了しました！\n${pdf.numPages}ページを保存しました`;
+    await refresh();
+  }catch(e){
+    $('status').textContent='抽出エラー：'+e.message;
+  }finally{
+    button.disabled=false;
   }
-  statusEl.textContent='PDFの保存が完了しました！';
- }catch(e){
-  statusEl.textContent='保存エラー：'+e.message;
- }
- finally{
-  picker.value='';
-  button.disabled=false;
-  await refresh();
- }
+}
+
+$('search').onclick=async()=>{
+  const keyword=$('question').value.trim().toLowerCase();
+  $('results').innerHTML='';
+  if(!keyword){
+    $('results').textContent='検索する言葉を入力してください';
+    return;
+  }
+
+  $('results').textContent='検索中...';
+  try{
+    const pages=await getAllPages();
+    const matches=pages.filter(p=>p.text.toLowerCase().includes(keyword));
+
+    $('results').innerHTML='';
+    if(!matches.length){
+      $('results').textContent='該当する文章が見つかりませんでした。PDFの文字抽出が済んでいるか確認してください。';
+      return;
+    }
+
+    const heading=document.createElement('p');
+    heading.textContent=`検索結果：${matches.length}件`;
+    $('results').append(heading);
+
+    for(const item of matches.slice(0,100)){
+      const div=document.createElement('div');
+      div.className='result';
+      const title=document.createElement('strong');
+      title.textContent=`${item.filename}（${item.page}ページ）`;
+      const body=document.createElement('p');
+      const pos=item.text.toLowerCase().indexOf(keyword);
+      const start=Math.max(0,pos-100);
+      body.textContent=item.text.slice(start,start+350);
+      div.append(title,body);
+      $('results').append(div);
+    }
+  }catch(e){
+    $('results').textContent='検索エラー：'+e.message;
+  }
 };
 
 init();
@@ -196,3 +291,4 @@ init();
 </html>
 
 
+  
