@@ -2,80 +2,197 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#172554">
-  <title>My Manual AI</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 20px;
-      background: #f1f5f9;
-      color: #1e293b;
-      font-family: sans-serif;
-    }
-    header {
-      background: #172554;
-      color: white;
-      padding: 22px;
-      border-radius: 16px;
-    }
-    h1 { margin: 0; font-size: 24px; }
-    .sub { color: #cbd5e1; font-size: 13px; }
-    .card {
-      background: white;
-      padding: 18px;
-      margin-top: 18px;
-      border-radius: 14px;
-      box-shadow: 0 2px 8px #0000000d;
-    }
-    button {
-      width: 100%;
-      padding: 14px;
-      border: 0;
-      border-radius: 10px;
-      background: #2563eb;
-      color: white;
-      font-size: 16px;
-      font-weight: bold;
-      margin-top: 10px;
-    }
-    .stat { font-size: 24px; font-weight: bold; }
-    .hint { color: #64748b; font-size: 13px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#172554">
+<title>My Manual AI</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:18px;background:#f1f5f9;color:#1e293b;font-family:sans-serif}
+header{background:#172554;color:white;padding:24px;border-radius:18px}
+h1{margin:0;font-size:25px}
+.sub{color:#cbd5e1}
+.card{background:white;padding:20px;margin-top:18px;border-radius:16px;box-shadow:0 2px 8px #0001}
+button{width:100%;padding:15px;border:0;border-radius:11px;background:#2563eb;color:white;font-size:16px;font-weight:bold;margin-top:10px}
+button:disabled{opacity:.5}
+input{width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px}
+.hint{color:#64748b;font-size:13px}
+.stat{font-size:25px;font-weight:bold}
+.item{border-top:1px solid #e2e8f0;padding:12px 0;overflow-wrap:anywhere}
+.item button{background:#dc2626;font-size:13px;padding:9px}
+#status{white-space:pre-wrap;color:#2563eb;font-size:14px}
+</style>
 </head>
 <body>
-  <header>
-    <h1>📚 My Manual AI</h1>
-    <p class="sub">自分専用マニュアル検索</p>
-  </header>
 
-  <section class="card">
-    <h3>📂 PDFマニュアル管理</h3>
-    <p class="hint">スマホ内のPDFを登録して管理します。</p>
-    <button onclick="alert('次のステップで追加します！')">
-      ＋ PDFを追加
-    </button>
-  </section>
+<header>
+<h1>📚 My Manual AI</h1>
+<p class="sub">自分専用マニュアル検索</p>
+</header>
 
-  <section class="card">
-    <h3>🔍 マニュアル検索</h3>
-    <input
-      type="text"
-      placeholder="質問やキーワードを入力"
-      style="width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:10px"
-    >
-    <button onclick="alert('検索機能は次のステップで追加します！')">
-      検索する
-    </button>
-  </section>
+<section class="card">
+<h3>📂 PDFマニュアル管理</h3>
+<p class="hint">スマホ内にPDFを保存します。</p>
 
-  <section class="card">
-    <h3>💾 登録状況</h3>
-    <p>登録PDF数</p>
-    <div class="stat">0 件</div>
-    <p class="hint">PDFはまだ登録されていません。</p>
-  </section>
+<input id="picker" type="file" accept="application/pdf,.pdf" multiple hidden>
+
+<button id="add">＋ PDFを追加</button>
+<p id="status">保存先を確認しています...</p>
+</section>
+
+<section class="card">
+<h3>💾 登録状況</h3>
+<p>登録PDF数</p>
+<div class="stat" id="count">0 件</div>
+<p>登録済みPDF容量</p>
+<div class="stat" id="total">0 MB</div>
+<p class="hint" id="storage">端末ストレージ確認中</p>
+</section>
+
+<section class="card">
+<h3>📚 登録済みマニュアル</h3>
+<div id="files">まだPDFはありません。</div>
+</section>
+
+<section class="card">
+<h3>🔍 マニュアル検索</h3>
+<input id="question" placeholder="質問やキーワードを入力">
+<button onclick="alert('次の段階で検索機能を追加します！')">検索する</button>
+<p class="hint">検索機能は次の開発段階で追加します。</p>
+</section>
+
+<script>
+const statusEl=document.getElementById('status');
+const picker=document.getElementById('picker');
+let library=null;
+
+function formatSize(bytes){
+ if(bytes<1024*1024)return (bytes/1024).toFixed(1)+' KB';
+ return (bytes/1024/1024).toFixed(1)+' MB';
+}
+
+async function init(){
+ try{
+  if(!navigator.storage?.getDirectory){
+   throw new Error('このブラウザは端末内ファイル保存に対応していません。Chromeで開いてください。');
+  }
+  library=await (await navigator.storage.getDirectory())
+    .getDirectoryHandle('ManualLibrary',{create:true});
+  if(navigator.storage.persist){
+   await navigator.storage.persist();
+  }
+  statusEl.textContent='端末内の保存先を準備できました。';
+  await refresh();
+ }catch(e){
+  statusEl.textContent='準備できませんでした：'+e.message;
+ }
+}
+
+async function refresh(){
+ if(!library)return;
+ let count=0,total=0;
+ const list=document.getElementById('files');
+ list.innerHTML='';
+ for await(const [name,handle] of library.entries()){
+  if(handle.kind!=='file')continue;
+  const file=await handle.getFile();
+  count++;total+=file.size;
+  const item=document.createElement('div');
+  item.className='item';
+  const title=document.createElement('strong');
+  title.textContent=name;
+  const info=document.createElement('p');
+  info.className='hint';
+  info.textContent=formatSize(file.size);
+  const del=document.createElement('button');
+  del.textContent='削除';
+  del.onclick=async()=>{
+   if(confirm(name+' を削除しますか？')){
+    await library.removeEntry(name);
+    await refresh();
+   }
+  };
+  item.append(title,info,del);
+  list.appendChild(item);
+ }
+ if(count===0)list.textContent='まだPDFはありません。';
+ document.getElementById('count').textContent=count+' 件';
+ document.getElementById('total').textContent=formatSize(total);
+
+ try{
+  const estimate=await navigator.storage.estimate();
+  const quota=estimate.quota||0;
+  const usage=estimate.usage||0;
+  document.getElementById('storage').textContent=
+   'ブラウザ全体の使用量：約'+formatSize(usage)+
+   ' / 利用可能枠：約'+formatSize(quota);
+ }catch(e){
+  document.getElementById('storage').textContent='容量情報を取得できません。';
+ }
+}
+
+document.getElementById('add').onclick=()=>{
+ if(!library){
+  statusEl.textContent='保存先を準備できていません。';
+  return;
+ }
+ picker.click();
+};
+
+picker.onchange=async()=>{
+ const files=Array.from(picker.files||[]);
+ if(!files.length)return;
+ const button=document.getElementById('add');
+ button.disabled=true;
+ try{
+  for(let i=0;i<files.length;i++){
+   const file=files[i];
+   if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf')){
+    throw new Error(file.name+' はPDFではありません。');
+   }
+   const estimate=await navigator.storage.estimate();
+   const available=(estimate.quota||0)-(estimate.usage||0);
+   if(file.size>available){
+    throw new Error('保存容量が不足しています。'+file.name);
+   }
+
+   let name=file.name;
+   let n=1;
+   while(true){
+    try{
+     await library.getFileHandle(name);
+     const dot=file.name.lastIndexOf('.');
+     name=dot>0?file.name.slice(0,dot)+' ('+n+++')'+file.name.slice(dot):file.name+' ('+n+++')';
+    }catch(e){
+     break;
+    }
+   }
+
+   statusEl.textContent='保存中 '+(i+1)+' / '+files.length+'：'+name;
+   const handle=await library.getFileHandle(name,{create:true});
+   const writable=await handle.createWritable();
+   try{
+    await file.stream().pipeTo(writable);
+   }catch(e){
+    try{await writable.abort()}catch(_){}
+    await library.removeEntry(name).catch(()=>{});
+    throw e;
+   }
+  }
+  statusEl.textContent='PDFの保存が完了しました！';
+ }catch(e){
+  statusEl.textContent='保存エラー：'+e.message;
+ }
+ finally{
+  picker.value='';
+  button.disabled=false;
+  await refresh();
+ }
+};
+
+init();
+</script>
 </body>
 </html>
+
+
