@@ -1,0 +1,81 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172554">
+  <title>My Manual AI</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #f1f5f9;
+      color: #1e293b;
+      font-family: sans-serif;
+    }
+    header {
+      background: #172554;
+      color: white;
+      padding: 22px;
+      border-radius: 16px;
+    }
+    h1 { margin: 0; font-size: 24px; }
+    .sub { color: #cbd5e1; font-size: 13px; }
+    .card {
+      background: white;
+      padding: 18px;
+      margin-top: 18px;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px #0000000d;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    .stat { font-size: 24px; font-weight: bold; }
+    .hint { color: #64748b; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📚 My Manual AI</h1>
+    <p class="sub">自分専用マニュアル検索</p>
+  </header>
+
+  <section class="card">
+    <h3>📂 PDFマニュアル管理</h3>
+    <p class="hint">スマホ内のPDFを登録して管理します。</p>
+    <button onclick="alert('次のステップで追加します！')">
+      ＋ PDFを追加
+    </button>
+  </section>
+
+  <section class="card">
+    <h3>🔍 マニュアル検索</h3>
+    <input
+      type="text"
+      placeholder="質問やキーワードを入力"
+      style="width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:10px"
+    >
+    <button onclick="alert('検索機能は次のステップで追加します！')">
+      検索する
+    </button>
+  </section>
+
+  <section class="card">
+    <h3>💾 登録状況</h3>
+    <p>登録PDF数</p>
+    <div class="stat">0 件</div>
+    <p class="hint">PDFはまだ登録されていません。</p>
+  </section>
+</body>
+</html>
