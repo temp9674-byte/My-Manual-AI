@@ -394,7 +394,10 @@ $('askAI').onclick = async () => {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || 'AIとの通信に失敗しました');
+      throw new Error(
+  [result.error, result.detail].filter(Boolean).join('：')
+  || 'AIとの通信に失敗しました'
+);
     }
 
     $('aiAnswer').textContent = result.answer;
