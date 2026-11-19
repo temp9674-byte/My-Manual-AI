@@ -44,6 +44,27 @@ input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #bbb;border
 <button id="search">検索する</button>
 <div id="results"></div>
 </div>
+<div class="card">
+  <h3>④ AIに質問する</h3>
+  <p class="small">
+    登録したマニュアルの内容についてAIに質問できます。
+  </p>
+  <input
+    id="appPassword"
+    type="password"
+    autocomplete="off"
+    placeholder="アプリ用パスワード"
+  >
+  <input
+    id="aiQuestion"
+    type="text"
+    placeholder="例：機械のエラーが出たときの対処方法は？"
+  >
+  <button id="askAI">AIに質問する</button>
+  <p id="aiStatus"></p>
+  <div id="aiAnswer"></div>
+</div>
+
 <p class="small">PDFの保存と抽出した文章の検索は、この端末内で行います。PDF.jsの読み込みにはインターネット接続が必要です。</p>
 </main>
 
